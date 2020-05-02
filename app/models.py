@@ -3,6 +3,14 @@ from flask_login import UserMixin
 
 
 class User(UserMixin, db.Model):
+    def __init__(self, **kwargs):
+        super(User, self).__init__()
+        self.social_id = kwargs.get('social_id')
+        self.first_name = kwargs.get('first_name')
+        self.last_name = kwargs.get('last_name')
+        self.commit_to_db()
+        self.register_friends(kwargs.get('friends'))
+
     id = db.Column(db.Integer, primary_key=True)
     social_id = db.Column(db.String(64), nullable=False, unique=True)
     first_name = db.Column(db.String(64), nullable=False)
@@ -14,7 +22,8 @@ class User(UserMixin, db.Model):
             friend_model = Friend(
                 first_name=friend['first_name'],
                 last_name=friend['last_name'],
-                city=('No information' if friend.get('city') is None else friend['city']['title']),
+                city=(friend['city']['title'] if 'city' in friend
+                      else 'No information'),
                 user_id=self.id
             )
             friend_model.commit_to_db()

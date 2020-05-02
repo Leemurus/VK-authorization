@@ -4,10 +4,10 @@ from flask import current_app
 
 
 class Provider:
-    providers = None
+    _providers = None
 
     def __init__(self, provider_name):
-        self.provider_name = provider_name
+        self._provider_name = provider_name
 
     def authorize(self):
         pass
@@ -15,25 +15,28 @@ class Provider:
     def callback(self, code):
         pass
 
-    def get_callback_url(self):
-        return current_app.config['URL'] + 'api/callback/' + self.provider_name
+    def get_provider_name(self):
+        return self._provider_name
+
+    def _get_callback_url(self):
+        return current_app.config['URL'] + 'api/callback/' + self._provider_name
 
     @classmethod
-    def create_providers(cls):
+    def _create_providers(cls):
         for provider_class in cls.__subclasses__():
             provider = provider_class()
-            cls.providers[provider.provider_name] = provider_class()
+            cls._providers[provider.get_provider_name()] = provider_class()
 
     @classmethod
     def get_provider(cls, provider_name):
         if provider_name not in current_app.config['OAUTHS']:
             return None
 
-        if cls.providers is None:
-            cls.providers = {}
-            cls.create_providers()
+        if cls._providers is None:
+            cls._providers = {}
+            cls._create_providers()
 
-        return cls.providers.get(provider_name)
+        return cls._providers.get(provider_name)
 
 
 class VKProvider(Provider):
@@ -44,14 +47,14 @@ class VKProvider(Provider):
             client_id=current_app.config['OAUTHS']['vk']['client_id'],
             client_secret=current_app.config['OAUTHS']['vk']['client_secret'],
             authorize_url=current_app.config['OAUTHS']['vk']['authorize_url'],
-            access_token_url=current_app.config['OAUTHS']['vk']['access_token_url']
+            access_token_url=current_app.config['OAUTHS']['vk']['token_url']
         )
 
     def authorize(self):
         return self._service.get_authorize_url(
             scope='2',
             response_type='code',
-            redirect_uri=self.get_callback_url()
+            redirect_uri=self._get_callback_url()
         )
 
     def callback(self, code):
@@ -64,7 +67,7 @@ class VKProvider(Provider):
         oauth_session = self._service.get_auth_session(
             data={'code': code,
                   'grant_type': 'authorization_code',
-                  'redirect_uri': self.get_callback_url()},
+                  'redirect_uri': self._get_callback_url()},
             decoder=new_decoder
         )
 
@@ -80,5 +83,4 @@ class VKProvider(Provider):
                     'count': 5, 'fields': 'city'}
         ).json()['response']['items']
 
-        return (user_information['id'], user_information['first_name'],
-                user_information['last_name'], friends)
+        return user_information, friends
